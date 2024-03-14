@@ -6,78 +6,66 @@ import os
 import string
 import pandas as pd
 import requests
-from article_processing import create_text_dict_from_folder
-from orm_summarize import *
+# from article_processing import create_text_dict_from_folder
+# from orm_summarize import *
 api_key = os.getenv('api_ncbi') # Pubmed API key
 
 ### These scripts populate data in the sources table with data from the Pubmed API.
 
-def search_article(title, publication, api_key, verbose=False):
+def search_article(
+        query, api_key, query_tag='[ti]', publication=None, reldate=None,
+        systematic_only=False, review_only=False, verbose=False
+        ):
     """
     Search for article title in PubMed database.
 
     Parameters:
     - title (str): article title
     - api_key (str): NCBI API key
+    - reldate (int): the search returns only those items that have a date specified by datetype within the last n days.
 
     Returns:
     response (str): Article metadata from PubMed database if present. Otherwise, returns list of PMIDs.
+
+    API documentation: https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.ESearch
+    Pubmed User Guide including tags for filtering results: https://pubmed.ncbi.nlm.nih.gov/help/
     """
     base_url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi'
-    title_without_not = re.sub(r'not', '', title)
+    data = {}
     if api_key:
         base_url += f'&api_key={api_key}'
+    search_term = f'"{re.sub(r'not', '', query)}"' # Remove 'not' since it will be treated as a boolean
+    if query_tag:
+        search_term += f'{query_tag}'
     if publication:
-        search_term = f'({title_without_not} [ti]) AND ({publication} [ta])'
-    else:
-        search_term = f'{title_without_not} [ti]'
+        search_term = f'AND {publication} [ta]'
+    if systematic_only:
+        search_term += ' AND systematic[sb]'
+    elif review_only:
+        search_term += ' AND (systematic[sb] OR review[pt])'
     params = {
         'db': 'pubmed',
         'term': search_term,
         'retmax': 5,
-        'retmode': 'json'
+        'retmode': 'json',
+        'datetype':'edat',
     }
+    if reldate:
+        params['reldate'] = reldate
     print(f'Search term: {search_term}')
 
     response = requests.get(base_url, params=params)
     data = response.json()
-
-    cleaned_title = re.sub(r'</?[ib]>', '', title) # remove bold and italic html tags
-    cleaned_title = re.sub(r'[^a-zA-Z0-9 ]', '', cleaned_title).lower().strip()
-    cleaned_title = re.sub(r"\u2010", '', cleaned_title)
     try:
         id_list = data['esearchresult']['idlist']
         if id_list:
             for index in range(len(id_list)):
                 result = retrieve_citation(id_list[index], api_key).decode('utf-8')
-                cleaned_result = re.sub(r'[^a-zA-Z0-9 <>/]', '', result).lower().strip() 
-                result_title_match = re.search(r'<articletitle>(.*?)</articletitle>', cleaned_result)
-                if result_title_match:
-                    result_title = result_title_match.group(1)
-                    cleaned_result_title = re.sub(r'</?[ib]>', '', result_title)
-                    cleaned_result_title = re.sub(r'/(?![^<>]*>)', '', cleaned_result_title) # Remove any / that is not within html tag
-                    cleaned_result_title = re.sub(r'[^a-zA-Z0-9 <>/]', '', cleaned_result_title).lower().strip()
-                    if index == 0:
-                        first_cleaned_result = cleaned_result
-                        first_result_title = result_title
-                        first_cleaned_result_title = cleaned_result_title
-                else:
-                    cleaned_result_title = cleaned_result
-                if cleaned_title == cleaned_result_title:
-                    if verbose:
-                        print(f'Match found for {title}: PMID = {id_list[index]}.')
-                    return result
-                else:
-                    continue
-            if cleaned_title != cleaned_result_title:
-                print(f'Warning: Article title not found in PMIDs.')
-                print(f'Check these PMIDs: {id_list}')
-                print(f'\tInput title: {title.lower().strip()}')
-                print(f'\tResult title: {first_result_title if first_result_title else first_cleaned_result}')
-                print(f'\tCleaned input title: {cleaned_title}')
-                print(f'\tCleaned first result title: {first_cleaned_result_title}\n') 
-                result = retrieve_citation(id_list[0], api_key).decode('utf-8')
             return result     
+        else:
+            print(f'No results found; returning API response object.')
+            return data
+                
     except Exception as error: 
         print(f'Response: \n{data}')
         exc_type, exc_obj, tb = sys.exc_info()
@@ -86,8 +74,41 @@ def search_article(title, publication, api_key, verbose=False):
         filename = file.f_code.co_filename
         print(f'\tAn error occurred on line {lineno} in {filename}: {error}')    
         print('Article not found.')
-        print(f'\tInput title: {title.lower().strip()}')
-        return ''.join([id for id in id_list]) 
+        return data
+    
+
+    # cleaned_title = re.sub(r'</?[ib]>', '', title) # remove bold and italic html tags
+    # cleaned_title = re.sub(r'[^a-zA-Z0-9 ]', '', cleaned_title).lower().strip()
+    # cleaned_title = re.sub(r"\u2010", '', cleaned_title)
+
+        #         cleaned_result = re.sub(r'[^a-zA-Z0-9 <>/]', '', result).lower().strip() 
+        #         result_title_match = re.search(r'<articletitle>(.*?)</articletitle>', cleaned_result)
+        #         if result_title_match:
+        #             result_title = result_title_match.group(1)
+        #             cleaned_result_title = re.sub(r'</?[ib]>', '', result_title)
+        #             cleaned_result_title = re.sub(r'/(?![^<>]*>)', '', cleaned_result_title) # Remove any / that is not within html tag
+        #             cleaned_result_title = re.sub(r'[^a-zA-Z0-9 <>/]', '', cleaned_result_title).lower().strip()
+        #             if index == 0:
+        #                 first_cleaned_result = cleaned_result
+        #                 first_result_title = result_title
+        #                 first_cleaned_result_title = cleaned_result_title
+        #         else:
+        #             cleaned_result_title = cleaned_result
+        #         if cleaned_title == cleaned_result_title:
+        #             if verbose:
+        #                 print(f'Match found for {title}: PMID = {id_list[index]}.')
+        #             return result
+        #         else:
+        #             continue
+        #     if cleaned_title != cleaned_result_title:
+        #         print(f'Warning: Article title not found in PMIDs.')
+        #         print(f'Check these PMIDs: {id_list}')
+        #         print(f'\tInput title: {title.lower().strip()}')
+        #         print(f'\tResult title: {first_result_title if first_result_title else first_cleaned_result}')
+        #         print(f'\tCleaned input title: {cleaned_title}')
+        #         print(f'\tCleaned first result title: {first_cleaned_result_title}\n') 
+        #         result = retrieve_citation(id_list[0], api_key).decode('utf-8')
+        #     return result     
     
 def retrieve_citation(article_id, api_key):
     """
