@@ -32,7 +32,7 @@ class Pubmed_API:
             base_url += f'&api_key={self.api_key}'
         response = {}
         results = pd.DataFrame()
-        search_term = f'"{re.sub(r"not", "", query)}"'  # Remove 'not' since it will be treated as a boolean
+        search_term = f'{re.sub(r"not", "", query)}'  # Remove 'not' since it will be treated as a boolean
         if query_tag:
             search_term += f'{query_tag}'
         if publication:
@@ -126,7 +126,6 @@ class Pubmed_API:
             'db': 'pubmed',
             'id': article_id
         }
-
         response = requests.get(base_url, params=params)
         return response.content
 
@@ -191,7 +190,6 @@ class Pubmed_API:
         # Extract MeshHeadingList
         MeshHeadingList = re.search(r'<MeshHeadingList>(.*?)</MeshHeadingList>', record_string)
         MeshHeadingList = MeshHeadingList.group(1) if MeshHeadingList else ''
-        
         return {
             'pubmed_title': article_title,
             'abstract': abstract,
