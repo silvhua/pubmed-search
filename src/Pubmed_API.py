@@ -22,6 +22,7 @@ class Pubmed_API:
         self.responses_dict = {}
         self.results_dict = {}
         self.PMIDs_dict = {}
+        self.record_strings_dict = {}
 
     def search_article(self, query, query_tag=None, publication=None, reldate=None, retmax=None,
         systematic_only=False, review_only=False, verbose=False, additional_search_params=None
@@ -78,6 +79,7 @@ class Pubmed_API:
         try:
             result_dict = {}
             record_strings_list = self.batch_retrieve_citation(self.responses_dict[self.iteration])
+            self.record_strings_dict[self.iteration] = record_strings_list
             for index, record_string in enumerate(record_strings_list):
                 result_dict[index] = self.extract_pubmed_details(record_string)
 
@@ -169,8 +171,12 @@ class Pubmed_API:
         doi = re.search(r'<ELocationID.*?EIdType="doi".*?>(.*?)</ELocationID>', record_string)
         doi = doi.group(1) if doi else ''
 
+        # Extract PMID
+        pmid = re.search(r'<PMID.*?>(.*?)</PMID>', record_string)
+        pmid = pmid.group(1) if pmid else ''
+
         abstract_matches = re.findall(r'(<AbstractText.*?>.*?</AbstractText>)', record_string)
-        print(f'Number of abstract sections: {len(abstract_matches)}')
+        self.logger.debug(f'Number of abstract sections: {len(abstract_matches)}')
         if len(abstract_matches) > 1:
             cleaned_abstract_sections = []
             for match in abstract_matches:
@@ -198,5 +204,6 @@ class Pubmed_API:
             'start_page': start_page,
             'end_page': end_page,
             'doi': doi,
+            'pmid': pmid,
             'mesh_headings': MeshHeadingList
         }
