@@ -18,14 +18,15 @@ class Pubmed_API:
     def __init__(self, api_key=os.getenv('api_ncbi'), logger=None, logging_level=logging.INFO):
         self.api_key = api_key
         self.logger = create_function_logger('Pubmed_API', logger, level=logging_level)
-        self.iteration = 1
+        self.iteration = 0
         self.responses_dict = {}
         self.results_dict = {}
         self.PMIDs_dict = {}
         self.record_strings_dict = {}
 
     def search_article(self, query, query_tag=None, publication=None, reldate=None, retmax=None,
-        systematic_only=False, review_only=False, verbose=False, additional_search_params=None
+        systematic_only=False, review_only=False, additional_search_params=None, ids_only=False, 
+        verbose=True
         ):
         base_url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi'
         if self.api_key:
@@ -55,14 +56,22 @@ class Pubmed_API:
         if additional_search_params:
             params.update(additional_search_params)
         self.logger.info(f'Search term: {search_term}')
+        messages = []
         try:
+            self.iteration += 1
             response = requests.get(base_url, params=params)
             response_dict = response.json()
+            id_list = response_dict['esearchresult']['idlist']
+            messages.append(f'{len(id_list)} PMIDs found.')
+            if verbose==True:
+                messages.append(f'{id_list}')
+            self.PMIDs_dict[self.iteration] = id_list
             self.responses_dict[self.iteration] = response_dict
-            result_dict = self.get_article_data_by_title()
-            self.results_dict[self.iteration] = result_dict
-            self.iteration += 1
-            results = pd.DataFrame(result_dict).transpose()
+            if ids_only==False:
+                results = self.get_article_data_by_title()
+            else:
+                results = id_list
+            self.logger.info('\n'.join(messages))
         except Exception as error:
             error_messages = []
             exc_type, exc_obj, tb = sys.exc_info()
@@ -75,17 +84,20 @@ class Pubmed_API:
         
         return results
 
-    def get_article_data_by_title(self):
+    def get_article_data_by_title(self, iteration=None):
+        result_df = pd.DataFrame()
         try:
             result_dict = {}
-            record_strings_list = self.batch_retrieve_citation(self.responses_dict[self.iteration])
-            self.record_strings_dict[self.iteration] = record_strings_list
+            iteration = self.iteration if iteration == None else iteration
+            record_strings_list = self.batch_retrieve_citation(iteration)
+            self.record_strings_dict[iteration] = record_strings_list
             for index, record_string in enumerate(record_strings_list):
                 result_dict[index] = self.extract_pubmed_details(record_string)
-
+            self.results_dict[iteration] = result_dict
+            result_df = pd.DataFrame(result_dict).transpose()
         except Exception as error:
             error_messages = []
-            error_messages.append(f'Response: \n{self.PMIDs_dict[self.iteration]}')
+            error_messages.append(f'Response: \n{self.PMIDs_dict.get(iteration)}')
             exc_type, exc_obj, tb = sys.exc_info()
             file = tb.tb_frame
             lineno = tb.tb_lineno
@@ -93,14 +105,13 @@ class Pubmed_API:
             message = f'\tAn error occurred on line {lineno} in {filename}: {error}'
             error_messages.append(message)
             self.logger.error('\n'.join(error_messages))
-        return result_dict
+        return result_df
 
-    def batch_retrieve_citation(self, response_dict):
+    def batch_retrieve_citation(self, iteration):
         result_list = []
         messages = []
         try:
-            id_list = response_dict['esearchresult']['idlist']
-            self.PMIDs_dict[self.iteration] = id_list
+            id_list = self.PMIDs_dict.get(iteration)
             if id_list:
                 self.logger.info(f'Extracting these {len(id_list)} PMIDs: {id_list}')
                 for index, id in enumerate(id_list):
@@ -109,7 +120,7 @@ class Pubmed_API:
             else:
                 self.logger.warning(f'No results found.')
         except Exception as error:
-            messages.append(f'Response: \n{response_dict}')
+            messages.append(f'Response: \n{self.responses_dict.get(iteration)}')
             exc_type, exc_obj, tb = sys.exc_info()
             file = tb.tb_frame
             lineno = tb.tb_lineno
