@@ -9,7 +9,20 @@ import requests
 # from orm_summarize import *
 api_key = os.getenv('api_ncbi') # Pubmed API key
 
-### These scripts populate data in the sources table with data from the Pubmed API.
+def retrieve_citation(article_id, api_key):
+    """
+    Retrieve article metadata from PubMed database.
+    """
+    base_url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi'
+    if api_key:
+        base_url += f'&api_key={api_key}'
+    params = {
+        'db': 'pubmed',
+        'id': article_id
+    }
+
+    response = requests.get(base_url, params=params)
+    return response.content
 
 def search_article(
         query, api_key, query_tag=None, publication=None, reldate=None, retmax=None,
@@ -61,7 +74,7 @@ def search_article(
     response = requests.get(base_url, params=params)
     data = response.json()
     return data
-    
+
 def batch_retrieve_citation(data):
     result_list = []
     try:
@@ -83,54 +96,6 @@ def batch_retrieve_citation(data):
         print(f'\tAn error occurred on line {lineno} in {filename}: {error}')    
         print('Article {current_index} [{current_id}] not found.')
     return result_list
-
-    # cleaned_title = re.sub(r'</?[ib]>', '', title) # remove bold and italic html tags
-    # cleaned_title = re.sub(r'[^a-zA-Z0-9 ]', '', cleaned_title).lower().strip()
-    # cleaned_title = re.sub(r"\u2010", '', cleaned_title)
-
-        #         cleaned_result = re.sub(r'[^a-zA-Z0-9 <>/]', '', result).lower().strip() 
-        #         result_title_match = re.search(r'<articletitle>(.*?)</articletitle>', cleaned_result)
-        #         if result_title_match:
-        #             result_title = result_title_match.group(1)
-        #             cleaned_result_title = re.sub(r'</?[ib]>', '', result_title)
-        #             cleaned_result_title = re.sub(r'/(?![^<>]*>)', '', cleaned_result_title) # Remove any / that is not within html tag
-        #             cleaned_result_title = re.sub(r'[^a-zA-Z0-9 <>/]', '', cleaned_result_title).lower().strip()
-        #             if index == 0:
-        #                 first_cleaned_result = cleaned_result
-        #                 first_result_title = result_title
-        #                 first_cleaned_result_title = cleaned_result_title
-        #         else:
-        #             cleaned_result_title = cleaned_result
-        #         if cleaned_title == cleaned_result_title:
-        #             if verbose:
-        #                 print(f'Match found for {title}: PMID = {id_list[index]}.')
-        #             return result
-        #         else:
-        #             continue
-        #     if cleaned_title != cleaned_result_title:
-        #         print(f'Warning: Article title not found in PMIDs.')
-        #         print(f'Check these PMIDs: {id_list}')
-        #         print(f'\tInput title: {title.lower().strip()}')
-        #         print(f'\tResult title: {first_result_title if first_result_title else first_cleaned_result}')
-        #         print(f'\tCleaned input title: {cleaned_title}')
-        #         print(f'\tCleaned first result title: {first_cleaned_result_title}\n') 
-        #         result = retrieve_citation(id_list[0], api_key).decode('utf-8')
-        #     return result     
-    
-def retrieve_citation(article_id, api_key):
-    """
-    Retrieve article metadata from PubMed database.
-    """
-    base_url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi'
-    if api_key:
-        base_url += f'&api_key={api_key}'
-    params = {
-        'db': 'pubmed',
-        'id': article_id
-    }
-
-    response = requests.get(base_url, params=params)
-    return response.content
 
 def extract_pubmed_details(record_string):
     """
@@ -205,7 +170,6 @@ def extract_pubmed_details(record_string):
         'mesh_headings': MeshHeadingList
     }
 
-
 def pubmed_details_by_title(api_response={}, record_strings_list=[], **kwargs):
     """
     Search for article title in PubMed database and return article details.
@@ -241,140 +205,3 @@ def pubmed_details_by_title(api_response={}, record_strings_list=[], **kwargs):
         message = f'\tAn error occurred on line {lineno} in {filename}: {error}'
         print(message) 
     return result
-
-def add_pubmed_details(text_df, api_key):
-    """
-    Add the article metadata to a DataFrame containing article title and text.
-
-    Parameters:
-    - text_df (pd.DataFrame): DataFrame containing article title and text.
-    - api_key (str): NCBI API key
-
-    Returns:
-    DataFrame with added PubMed details for each article.
-    """
-    article_details_list = []
-    for index in text_df.index:
-        article = text_df.loc[index, 'title']
-        text = str(text_df.loc[index, 'body'])
-        publication = text_df.loc[index, 'publication']
-        article_details = pubmed_details_by_title(article, publication, api_key)
-        if article_details:
-            article_details['text'] = text
-            article_details_list.append(article_details)
-        else:
-            article_details_list.append({
-                'pubmed_title': article,
-                'abstract': '',
-                'journal': publication,
-                'authors': '',
-                'year': '',
-                'month': '',
-                'pub_volume': '',
-                'pub_issue': '',
-                'start_page': '',
-                'end_page': '',
-                'doi': '',
-                'text': text,
-                'mesh_headings': ''
-            })
-    article_details_df = pd.DataFrame(article_details_list)
-    return pd.concat([text_df.reset_index(drop=True), article_details_df], axis=1)
-
-def compare_columns(df, col1='title', col2='pubmed_title'):
-    """
-    Compare two columns in a DataFrame. Drop the second column if the two columns are identical.
-    Otherwise, return the dataframe with new column with the comparison results, 
-    where `True` indicates a mismatch.
-
-    Parameters:
-    - df (pd.DataFrame): DataFrame containing the two columns to be compared.
-    - col1 (str): Name of the first column to be compared.
-    - col2 (str): Name of the second column to be compared.
-
-    Returns:
-    DataFrame with added column containing the comparison results.
-    """
-    # Remove punctuation and special characters
-    remove_punct = lambda text: re.sub(f'[{string.punctuation}]', '', text)
-    col1 = df[col1].apply(remove_punct)
-    col2 = df[col2].apply(remove_punct)
-
-    # Convert to lowercase and remove white spaces
-    clean_text = lambda text: text.lower().strip()
-    col1 = col1.apply(clean_text)
-    col2 = col2.apply(clean_text)
-
-    # Perform the comparison
-    comparison = col1 != col2
-    if sum(comparison) == 0:
-        df = df.drop(columns=['pubmed_title'])
-    else:
-        df['flag_title'] = comparison
-        flagged_indices = df[df['flag_title'] == True].index
-        for index in flagged_indices:
-            print(f'Flagged: ')
-            print(f'\tArticle title: {df.loc[index, "title"]}')
-            print(f'\tPubMed title: {df.loc[index, "pubmed_title"]}')
-            print()
-    
-    return df
-
-def create_sources_table(text_df, col1='title', col2='pubmed_title'):
-    references_df = add_pubmed_details(text_df, api_key)
-
-    references_df = compare_columns(references_df, col1=col1, col2=col2)
-    return references_df
-
-######## These functions are no longer needed
-
-def create_feed_table(article_dict, col1='title', col2='pubmed_title', section=None):
-    text_df = pd.DataFrame(article_dict).transpose()
-    feed_df = add_pubmed_details(text_df, api_key, section=section)
-
-    feed_df = compare_columns(feed_df, col1=col1, col2=col2)
-    return feed_df
-
-def initialize_text_df(folder_path, encoding='ISO-8859-1', subset=None):
-    """
-    Create a DataFrame from a folder containing text files.
-
-    Parameters:
-    - folder_path (str): Path to folder containing text files.
-    - encoding (str): Encoding of the text files.
-    - subset (int): Number of text files to be read. If None, read all files.
-
-    Returns:
-    DataFrame containing the text files.
-    """
-    text_dict = create_text_dict_from_folder(folder_path, encoding, subset)
-    text_df = pd.Series(text_dict, index=text_dict.keys())
-    return text_df
-
-def parse_fulltext(folder_path, title_pattern=r'^(.*)\n*.+', encoding='ISO-8859-1', subset=None):
-    # Initialize empty lists to store the captured groups
-    titles = []
-    bodies = []
-    
-    text_df = initialize_text_df(folder_path, encoding, subset)
-    # Iterate over each element in the series
-    for text in text_df:
-        # print(text)
-        # Apply the regular expression pattern
-        title_match = re.search(title_pattern, text)
-        
-        # Extract the capture groups and append them to the lists
-        if title_match:
-            titles.append(title_match.group(1))
-            body = re.sub(title_pattern, '', text)
-            bodies.append(body.strip())
-            
-        else:
-            titles.append(None)
-            bodies.append(None)
-    
-    # Create a new DataFrame from the captured groups
-    df = pd.DataFrame({ 'title': titles, 'text': bodies })
-    
-    return df
-
