@@ -186,7 +186,7 @@ class Pubmed_API:
         pmid = pmid.group(1) if pmid else ''
 
         abstract_matches = re.findall(r'(<AbstractText.*?>.*?</AbstractText>)', record_string)
-        self.logger.debug(f'Number of abstract sections: {len(abstract_matches)}')
+        # self.logger.debug(f'Number of abstract sections: {len(abstract_matches)}')
         if len(abstract_matches) > 1:
             cleaned_abstract_sections = []
             for match in abstract_matches:
@@ -201,6 +201,44 @@ class Pubmed_API:
         # Extract MeshHeadingList
         MeshHeadingList = re.search(r'<MeshHeadingList>(.*?)</MeshHeadingList>', record_string)
         MeshHeadingList = MeshHeadingList.group(1) if MeshHeadingList else ''
+
+        # Estract MeshHeading text and any QualifierName
+        MeshQualifiers = re.findall(
+            r'<QualifierName.?(?:UI=".*?")>(.*?)</QualifierName>', MeshHeadingList
+            )
+        mesh_headings = []
+        pattern = r'<MeshHeading><DescriptorName.*?>(.*?)</DescriptorName>(<QualifierName.*?>.*?</QualifierName>)?</MeshHeading>'
+        matches = re.findall(pattern, MeshHeadingList)
+        # print(f'mesh headings: {matches}')
+        for match in matches:
+            heading = match[0]
+            if match[1]: # Estract Mesh QualifierName                
+                MeshQualifiers = re.findall(
+                    r'<QualifierName.?(?:UI=".*?")>(.*?)</QualifierName>', match[1]
+                    )
+                print(f'mesh qualifiers: {MeshQualifiers}')
+                for qualifier in MeshQualifiers:
+                    heading = f"{match[0]} / {qualifier}"
+                    mesh_headings.append(heading)
+            else:
+                mesh_headings.append(heading)
+
+        # Extract keyword
+        Keyword_List = re.search(r'<KeywordList.*?>(.*?)</KeywordList>', record_string)
+        Keyword_List = Keyword_List.group(1) if Keyword_List else ''
+        Keywords = re.findall(
+            r'<Keyword.*?>(.*?)</Keyword>', Keyword_List
+            )
+        # Extract MajorTopic text
+        MajorTopics = re.findall(
+            r'<[^>]*MajorTopicYN="Y"[^>]*>([^<]+)<\/[^>]+>', record_string
+            )
+        # Extract Publication Type
+        PublicationTypeList = re.search(r'<PublicationTypeList.*?>(.*?)</PublicationTypeList>', record_string)
+        PublicationTypeList = PublicationTypeList.group(1) if PublicationTypeList else ''
+        PublicationType = re.findall(
+            r'<PublicationType.*?>(.*?)</PublicationType>', PublicationTypeList
+            )
         return {
             'pubmed_title': article_title,
             'abstract': abstract,
@@ -214,5 +252,8 @@ class Pubmed_API:
             'end_page': end_page,
             'doi': doi,
             'pmid': pmid,
-            'mesh_headings': MeshHeadingList
+            'mesh_headings': mesh_headings,
+            'keywords': Keywords,
+            'major_topics': MajorTopics,
+            'publication_type': PublicationType
         }
