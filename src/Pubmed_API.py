@@ -13,6 +13,7 @@ import sys
 import os
 import requests
 from Custom_Logger import *
+from table_mapping import concat_columns
 
 class Pubmed_API:
     def __init__(self, api_key=os.getenv('api_ncbi'), logger=None, logging_level=logging.INFO):
@@ -140,8 +141,155 @@ class Pubmed_API:
         response = requests.get(base_url, params=params)
         return response.content
 
+    def extract_pubmed_details_df(self, iteration=None):
+        """
+        Extract the Pubmed article details for the given list of record strings for the given iteration.
+
+        Returns:
+        DataFrame of the Pubmed article details.
+        """
+        df = pd.DataFrame()
+        record_strings = pd.Series(self.record_strings_dict.get(iteration if iteration else self.iteration))
+        regex_dict = {
+            'article_title': r'<ArticleTitle>(.*?)</ArticleTitle>',
+            'pmid': r'<PMID.*?>(.*?)</PMID>',
+            'journal': r'<Title>(.*?)</Title>',
+            'volume': r'<Volume>(.*?)</Volume>',
+            'issue': r'<Issue>(.*?)</Issue>',
+            'year': r'<PubDate><Year>(\d{4})</Year>',
+            'month': r'<PubDate>.*?<Month>(Aug)</Month>.*?</PubDate>',
+            'start_page': r'<StartPage>(.*?)</StartPage>',
+            'end_page': r'<EndPage>(.*?)</EndPage>',
+            'doi': r'<ELocationID.*?EIdType="doi".*?>(.*?)</ELocationID>',
+        }
+        for column, regex in regex_dict.items():
+            df[column] = record_strings.str.extract(regex)
+        df['abstract'] = self.df_extractall(
+            record_strings, parent_regex=r'<Abstract>(.*?)</Abstract>',
+            regex = r'<AbstractText.*?(?: Label="(.*?)")?.*?>(.*?)</AbstractText>',
+            logger=self.logger, sep=': ', join_strings=' '
+        )
+        df['mesh_headings'] = self.df_extractall(
+            record_strings, 
+            parent_regex=r'<MeshHeadingList>(.*?)</MeshHeadingList>',
+            regex=r'<MeshHeading><DescriptorName.*?>(.*?)</DescriptorName>(<QualifierName.*?>.*?</QualifierName>)?</MeshHeading>',
+            nested_regex=r'<QualifierName.*?>(.*?)</QualifierName>', logger=self.logger
+        )
+        df['authors'] = self.df_extractall(
+            record_strings, sep=' ',
+            regex=r'<Author ValidYN="Y".*?><LastName>(.*?)</LastName><ForeName>(.*?)</ForeName>',
+            logger=self.logger 
+        )
+        df['keywords'] = self.df_extractall(
+            record_strings, parent_regex=r'<KeywordList.*?>(.*?)</KeywordList>',
+            regex=r'<Keyword.*?>(.*?)</Keyword>', 
+            logger=self.logger
+        )
+        df['major_topics'] = self.df_extractall(
+            record_strings, 
+            regex=r'<[^>]*MajorTopicYN="Y"[^>]*>([^<]+)<\/[^>]+>', 
+            logger=self.logger
+        )
+        df['publication_type'] = self.df_extractall(
+            record_strings, parent_regex=r'<PublicationTypeList.*?>(.*?)</PublicationTypeList>',
+            regex=r'<PublicationType.*?>(.*?)</PublicationType>', 
+            logger=self.logger
+        )
+        columns = [
+            'article_title',
+            'abstract',
+            'mesh_headings',
+            'keywords',
+            'major_topics',
+            'pmid',
+            'doi',
+            'journal',
+            'volume',
+            'issue',
+            'year',
+            'month',
+            'start_page',
+            'end_page',
+            'authors',
+            'publication_type'
+        ]
+        return df[columns]
+
+    def df_extractall(self, 
+            series, regex, parent_regex=None, nested_regex=None, sep=[' ', ' / '], 
+            join_strings=False, logger=None
+            ):
+        """
+        Helper function called by `.search_article()` and `.get_article_data_by_title()` to parse 
+        article metadata from PubMed database.
+
+        Parameters:
+        - series: pd.Series
+        - regex: Regular expression to extract from the series.
+        - parent_regex (optional): Regular expression from which to extract the `regex`.
+            If None, `regex` will be extracted from the series.
+        - nested_regex (optional): Regular expression that is nested within `regex` to extract.
+        - sep (str or list; optional): String or list of strings used to separate multiple capture groups.
+            If it is a list, then the first value is used to separate the main capture groups. 
+            The second value is used to separate the nested capture groups. If the nested regex 
+            has multiple capture groups, then the last value is used to separate them.
+        - join_strings (optional): Boolean indicating whether to join the extracted values.
+        - logger (optional): Instance of Custom_Logger class.
+
+        Returns:
+        - pd.Series with the extracted values.
+        """
+        logger = create_function_logger('df_extractall', logger)
+        messages = []
+        messages.append(f'***Running `df_extractall` with regex {regex}***')
+        if parent_regex:
+            messages.append(f'\tparent_regex: {parent_regex}')
+        if nested_regex:
+            messages.append(f'\tnested_regex: {nested_regex}')
+        if parent_regex:
+            extracted = series.str.extract(parent_regex, expand=False)
+            series = extracted
+        extracted = series.str.extractall(regex).replace({np.nan: ''})
+        if extracted.shape[1] >= 1:
+            joined_values = extracted[0]
+        else:
+            messages.warning('No matches found.')
+            return series
+        if extracted.shape[1] > 1:
+            extracted.index.names = [f'{name if name else "index"}{index if index !=0 else ""}' for index, name in enumerate(extracted.index.names)]
+            for i in range(1, extracted.shape[1]):
+                if nested_regex:
+                    matches = extracted[i].str.extractall(nested_regex)#.replace({np.nan: ''})
+                    messages.append(f'Number of nested capture groups: {matches.shape[1]}')
+                    matches.columns = [f'nested_text{column}' for column in matches.columns]
+                    regex_df = extracted.merge(
+                        matches, how='left', left_index=True, right_index=True
+                    ).replace({np.nan: ''})
+                    nested_separator = sep if type(sep) == str else sep[1]
+                    if i == 1:
+                        root_column = 0 
+                        capture_group_separator = nested_separator
+                    else:
+                        root_column = 'Text'
+                        capture_group_separator = sep if type(sep) == str else sep[-1]
+                    regex_df = concat_columns(
+                        regex_df, [root_column, 'nested_text0'], 'Text', 
+                        sep=capture_group_separator
+                    )
+                    joined_values = regex_df['Text']
+
+                else:
+                    separator = sep if type(sep) == str else sep[0]
+                    joined_values = joined_values + separator + extracted[i]
+        new_series = joined_values.groupby(level=0).apply(lambda groupby: [match for match in groupby])
+        if (type(join_strings) == str) | (join_strings == True):
+            new_series = new_series.apply(lambda x: f'{join_strings if type(join_strings) == str else " "}'.join(x))
+        logger.debug('\n'.join(messages))
+        return new_series
+
     def extract_pubmed_details(self, record_string):
         """
+        [Archived: Use `extract_pubmed_details_df` instead to perform regex operations on the entire dataframe.]
         Helper function called by `pubmed_details_by_title` to parse article metadata from PubMed database.
         """
         authors = re.findall(r'<Author ValidYN="Y".*?><LastName>(.*?)</LastName><ForeName>(.*?)</ForeName>', record_string)
