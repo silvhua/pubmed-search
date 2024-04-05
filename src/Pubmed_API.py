@@ -203,18 +203,14 @@ class Pubmed_API:
         MeshHeadingList = MeshHeadingList.group(1) if MeshHeadingList else ''
 
         # Estract MeshHeading text and any QualifierName
-        MeshQualifiers = re.findall(
-            r'<QualifierName.?(?:UI=".*?")>(.*?)</QualifierName>', MeshHeadingList
-            )
         mesh_headings = []
         pattern = r'<MeshHeading><DescriptorName.*?>(.*?)</DescriptorName>(<QualifierName.*?>.*?</QualifierName>)?</MeshHeading>'
         matches = re.findall(pattern, MeshHeadingList)
-        # print(f'mesh headings: {matches}')
         for match in matches:
             heading = match[0]
             if match[1]: # Estract Mesh QualifierName                
                 MeshQualifiers = re.findall(
-                    r'<QualifierName.?(?:UI=".*?")>(.*?)</QualifierName>', match[1]
+                    r'<QualifierName.*?>(.*?)</QualifierName>', match[1]
                     )
                 print(f'mesh qualifiers: {MeshQualifiers}')
                 for qualifier in MeshQualifiers:
