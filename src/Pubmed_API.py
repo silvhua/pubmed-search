@@ -69,7 +69,6 @@ class Pubmed_API:
             
         Returns:
 
-
         API documentation: https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.ESearch
         Pubmed User Guide including tags for filtering results: https://pubmed.ncbi.nlm.nih.gov/help/
         """
@@ -127,17 +126,16 @@ class Pubmed_API:
             message = f'\tAn error occurred on line {lineno} in {filename}: {error}'
             error_messages.append(message)
             self.logger.error('\n'.join(error_messages))
-        
         return results
 
-    def get_article_data_by_title(self, iteration=None):
+    def get_article_data_by_title(self, iteration=None, orient='records'):
         result_df = pd.DataFrame()
         try:
             iteration = self.iteration if iteration == None else iteration
             record_strings_list = self.batch_retrieve_citation(iteration)
             self.record_strings_dict[iteration] = record_strings_list
             result_df = self.extract_pubmed_details_df(iteration)
-            self.results_dict[iteration] = result_df
+            self.results_dict[iteration] = result_df.to_dict(orient=orient)
         except Exception as error:
             error_messages = []
             error_messages.append(f'Response: \n{self.PMIDs_dict.get(iteration)}')
@@ -153,10 +151,11 @@ class Pubmed_API:
     def batch_retrieve_citation(self, iteration):
         result_list = []
         messages = []
+        messages.append(f'***Running `batch_retrieve_citation` with iteration {iteration}***')
         try:
             id_list = self.PMIDs_dict.get(iteration)
             if id_list:
-                self.logger.info(f'Extracting these {len(id_list)} PMIDs: {id_list}')
+                messages.append(f'Extracting {len(id_list)} PMIDs from iteration {iteration}.')
                 for index, id in enumerate(id_list):
                     result_list.append(self.retrieve_citation(id).decode('utf-8'))
                     current_index, current_id = index+1, id
@@ -165,7 +164,7 @@ class Pubmed_API:
                     if current_index % 10 == 0:
                         indicator+='|'
                     print(indicator, end='\n' if current_index%2==100 else '')
-                self.logger.info("Processing complete.")
+                messages.append("Processing complete.")
             else:
                 self.logger.warning(f'No results found.')
         except Exception as error:
@@ -176,6 +175,7 @@ class Pubmed_API:
             filename = file.f_code.co_filename
             messages.append(f'\tAn error occurred on line {lineno} in {filename}: {error}')
             messages.append(f'Article {current_index} [{current_id}] not found.')
+        self.logger.info('\n'.join(messages))
         return result_list
 
     def retrieve_citation(self, article_id):
@@ -262,7 +262,8 @@ class Pubmed_API:
             'authors',
             'publication_type'
         ]
-        return df[columns]
+        df = df[columns].replace({np.nan: None})
+        return df
 
     def df_extractall(self, 
             series, regex, parent_regex=None, nested_regex=None, sep=[' ', ' / '], 
@@ -288,7 +289,6 @@ class Pubmed_API:
         Returns:
         - pd.Series with the extracted values.
         """
-        logger = create_function_logger('df_extractall', logger)
         messages = []
         messages.append(f'***Running `df_extractall` with regex {regex}***')
         if parent_regex:
@@ -333,7 +333,7 @@ class Pubmed_API:
         new_series = joined_values.groupby(level=0).apply(lambda groupby: [match for match in groupby])
         if (type(join_strings) == str) | (join_strings == True):
             new_series = new_series.apply(lambda x: f'{join_strings if type(join_strings) == str else " "}'.join(x))
-        logger.debug('\n'.join(messages))
+        self.logger.debug('\n'.join(messages))
         return new_series
 
     def extract_pubmed_details(self, record_string):
