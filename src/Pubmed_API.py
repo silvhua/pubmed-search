@@ -7,6 +7,7 @@ import sys
 import os
 import requests
 from Custom_Logger import *
+import numpy as np
 api_key = os.getenv('api_ncbi') # Pubmed API key
 
 class Pubmed_API:
@@ -33,7 +34,6 @@ class Pubmed_API:
 
         Get the PMIDs and then the article data in one step.
 
-        result_dict[iteration] = Pubmed_API()
         df = result_dict[iteration].search_article(query, retmax=5, ids_only=False)
 
         """
@@ -163,6 +163,12 @@ class Pubmed_API:
                 for index, id in enumerate(id_list):
                     result_list.append(self.retrieve_citation(id).decode('utf-8'))
                     current_index, current_id = index+1, id
+                    # Show progress 
+                    indicator = '.'
+                    if current_index % 10 == 0:
+                        indicator+='|'
+                    print(indicator, end='\n' if current_index%2==100 else '')
+                self.logger.info("Processing complete.")
             else:
                 self.logger.warning(f'No results found.')
         except Exception as error:
@@ -447,6 +453,7 @@ class Pubmed_API:
             'publication_type': PublicationType
         }
 
+#################
 def concat_columns(df, columns, new_column, sep='; ', drop_columns=False,
     logger=None
     ):
