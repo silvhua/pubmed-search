@@ -133,14 +133,11 @@ class Pubmed_API:
     def get_article_data_by_title(self, iteration=None):
         result_df = pd.DataFrame()
         try:
-            result_dict = {}
             iteration = self.iteration if iteration == None else iteration
             record_strings_list = self.batch_retrieve_citation(iteration)
             self.record_strings_dict[iteration] = record_strings_list
-            for index, record_string in enumerate(record_strings_list):
-                result_dict[index] = self.extract_pubmed_details(record_string)
-            self.results_dict[iteration] = result_dict
-            result_df = pd.DataFrame(result_dict).transpose()
+            result_df = self.extract_pubmed_details_df(iteration)
+            self.results_dict[iteration] = result_df
         except Exception as error:
             error_messages = []
             error_messages.append(f'Response: \n{self.PMIDs_dict.get(iteration)}')
@@ -200,6 +197,7 @@ class Pubmed_API:
         DataFrame of the Pubmed article details.
         """
         df = pd.DataFrame()
+        self.logger.info('***Running `.extract_pubmed_details_df`***')
         record_strings = pd.Series(self.record_strings_dict.get(iteration if iteration else self.iteration))
         regex_dict = {
             'article_title': r'<ArticleTitle>(.*?)</ArticleTitle>',
