@@ -30,7 +30,8 @@ class Pubmed_API:
         self.record_strings_dict = {}
 
     def search_article(self, query, query_tag=None, publication=None, reldate=None, retmax=None,
-        systematic_only=False, review_only=False, additional_search_params=None, ids_only=False, 
+        systematic_only=False, review_only=False, period_filter=None,
+        additional_search_params=None, ids_only=False, 
         verbose=True
         ):
         """
@@ -47,7 +48,9 @@ class Pubmed_API:
         - systematic_only (bool, optional): If True, filter for only systematic review articles.
         - review_only (bool, optional): If True, filter for only systematic review or review articles.
         - additional_search_params (dict, optional): Additional search parameters to pass to the esearch API.
-
+        - period_filter (1, 5, or 10, optional): Filter for articles published in the past 1, 5, or 10 years.
+            Note: To filter by other periods, use `reldate` parameter as that is how the API works.
+            
         Returns:
 
 
@@ -68,6 +71,8 @@ class Pubmed_API:
             search_term += ' AND systematic[sb]'
         elif review_only:
             search_term += ' AND (systematic[sb] OR review[pt])'
+        if period_filter:
+            search_term += f' AND y_{period_filter}[Filter]'
         params = {
             'db': 'pubmed',
             'term': search_term,
