@@ -1,25 +1,41 @@
 import sys
-sys.path.append(r"/home/silvhua/custom_python")
 import os
 import pandas as pd
 import re
 import requests
-# from article_processing import create_text_dict_from_folder
-# from orm_summarize import *
-api_key = os.getenv('api_ncbi') # Pubmed API key
-
 import sys
 import os
 import requests
 from Custom_Logger import *
-from table_mapping import concat_columns
+api_key = os.getenv('api_ncbi') # Pubmed API key
 
 class Pubmed_API:
     def __init__(self, api_key=os.getenv('api_ncbi'), logger=None, logging_level=logging.INFO):
         """
         Parameters:
         - api_key (str): NCBI API key
-        
+        ---
+        # Example usage
+
+        result_dict = dict()
+        iteration = 1
+        query = 'query string'
+        result_dict[iteration] = Pubmed_API()
+
+        ## Option 1
+
+        2 steps: Get list of PMIDs first, then get the article data.
+
+        ids_list = result_dict[iteration].search_article(query, retmax=5, ids_only=True)
+        df = result_dict[iteration].get_article_data_by_title()
+
+        ## Option 2
+
+        Get the PMIDs and then the article data in one step.
+
+        result_dict[iteration] = Pubmed_API()
+        df = result_dict[iteration].search_article(query, retmax=5, ids_only=False)
+
         """
         self.api_key = api_key
         self.logger = create_function_logger('Pubmed_API', logger, level=logging_level)
@@ -430,3 +446,24 @@ class Pubmed_API:
             'major_topics': MajorTopics,
             'publication_type': PublicationType
         }
+
+def concat_columns(df, columns, new_column, sep='; ', drop_columns=False,
+    logger=None
+    ):
+    logger = create_function_logger(f'concat_columns_{__name__}', logger)
+    try:
+        df[columns] = df[columns].replace({np.nan: ''}).replace({-1: ''}).astype(str)
+        df[new_column] = df[columns[0]]
+        for column in columns[1:]:
+            df[new_column] = df[new_column].str.cat(df[column], sep=sep)
+        df[new_column] = df[new_column].replace({sep * (len(columns) - 1): None}).str.strip(sep)
+        if drop_columns:
+            df = df.drop(columns=columns)
+    except Exception as error:
+        exc_type, exc_obj, tb = sys.exc_info()
+        f = tb.tb_frame
+        lineno = tb.tb_lineno
+        filename = f.f_code.co_filename
+        message = f'An error occurred on line {lineno} in {filename}: {error}.'
+        logger.error(message)
+    return df
