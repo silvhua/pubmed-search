@@ -2,7 +2,6 @@ import sys
 sys.path.append(r"/home/silvhua/custom_python")
 import os
 import pandas as pd
-import string
 import re
 import requests
 # from article_processing import create_text_dict_from_folder
@@ -17,6 +16,11 @@ from table_mapping import concat_columns
 
 class Pubmed_API:
     def __init__(self, api_key=os.getenv('api_ncbi'), logger=None, logging_level=logging.INFO):
+        """
+        Parameters:
+        - api_key (str): NCBI API key
+        
+        """
         self.api_key = api_key
         self.logger = create_function_logger('Pubmed_API', logger, level=logging_level)
         self.iteration = 0
@@ -29,6 +33,27 @@ class Pubmed_API:
         systematic_only=False, review_only=False, additional_search_params=None, ids_only=False, 
         verbose=True
         ):
+        """
+        Search for article title in PubMed database.
+
+        Parameters:
+        - query (str): Pubmed search query.
+        - reldate (int, optional): The search returns only those items that have a date specified by datetype within the last n days.
+        - query_tag (str, optional): Query tag to append to the search query.
+        - publication (str, optional): Publication name.
+        - retmax (int, optional): Maximum number of results to return. 
+            If None, default is 20. API returns a maximum of 9999 results. To get more results for Pubmed,
+            need to use the command line: https://www.ncbi.nlm.nih.gov/books/NBK179288/
+        - systematic_only (bool, optional): If True, filter for only systematic review articles.
+        - review_only (bool, optional): If True, filter for only systematic review or review articles.
+        - additional_search_params (dict, optional): Additional search parameters to pass to the esearch API.
+
+        Returns:
+
+
+        API documentation: https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.ESearch
+        Pubmed User Guide including tags for filtering results: https://pubmed.ncbi.nlm.nih.gov/help/
+        """
         base_url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi'
         if self.api_key:
             base_url += f'&api_key={self.api_key}'
@@ -46,7 +71,6 @@ class Pubmed_API:
         params = {
             'db': 'pubmed',
             'term': search_term,
-            'retmax': 5,
             'retmode': 'json',
             'datetype': 'edat',
         }
