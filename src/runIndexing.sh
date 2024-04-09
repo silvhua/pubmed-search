@@ -1,0 +1,1 @@
+python src/indexing_pipeline.py prod_pubmed_results_2024-04-07_112508.json prod
