@@ -62,9 +62,10 @@ if __name__ == "__main__":
     logger = create_function_logger(__name__, parent_logger=None, level=logging.INFO)
     logger.info(f'System arguments: {sys.argv[1:]}')
     filename = sys.argv[1] if len(sys.argv) > 1 else 'pubmed_results_2024-04-06_235718.json'
-    filepath = sys.argv[2] if len(sys.argv) > 2 else '/home/silvhua/repositories/pubmed-search/data/'
+    collection_name = sys.argv[2] if len(sys.argv) > 2 else 'test_set'
+    filepath = sys.argv[3] if len(sys.argv) > 3 else '/home/silvhua/repositories/pubmed-search/data/'
     document_store = ChromaDocumentStore( # https://docs.haystack.deepset.ai/reference/integrations-chroma#chromadocumentstore
-        collection_name='test_set', 
+        collection_name=collection_name, 
         persist_path='../data/processed/'
         )
     
