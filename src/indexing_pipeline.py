@@ -3,7 +3,6 @@ from haystack.components.preprocessors import DocumentCleaner, DocumentSplitter
 from haystack.components.embedders import SentenceTransformersDocumentEmbedder
 from haystack.components.writers import DocumentWriter
 from haystack.document_stores.types import DuplicatePolicy
-from haystack.utils import ComponentDevice
 
 from haystack import Document
 from haystack_integrations.document_stores.chroma import ChromaDocumentStore
