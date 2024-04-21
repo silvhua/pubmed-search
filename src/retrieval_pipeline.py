@@ -39,7 +39,7 @@ class Retrieve_Docs:
         result = self.retrieval_pipeline.run({"text_embedder": {"text": query}})
         return result
 
-def get_unique_dicts(my_list):
+def get_unique_dicts(my_list, keys_to_ignore=[]):
     """
     Returns a list of unique dictionaries from a list of dictionaries.
 
@@ -49,9 +49,18 @@ def get_unique_dicts(my_list):
     Returns:
     - unique_dicts (list): A list of unique dictionaries.
     """
-    unique_elements = list(set(tuple(d.items()) for d in my_list))
-    unique_dicts = [dict(e) for e in unique_elements]
-    return unique_dicts
+    unique_elements = []
+    seen = set()
+    
+    for d in my_list:
+        filtered_dict = {k: v for k, v in d.items() if k not in keys_to_ignore}
+        dict_tuple = tuple(sorted(filtered_dict.items()))
+        
+        if dict_tuple not in seen:
+            unique_elements.append(d)
+            seen.add(dict_tuple)
+    
+    return unique_elements
 
 if __name__ == "__main__":
     logger = create_function_logger(__name__, parent_logger=None, level=logging.INFO)
@@ -73,7 +82,7 @@ if __name__ == "__main__":
             parsed_result.pop('source_id')
             parsed_result['score'] = result.score
             parsed_results_list.append(parsed_result)
-        parsed_results_list = get_unique_dicts(parsed_results_list)
+        parsed_results_list = get_unique_dicts(parsed_results_list, keys_to_ignore=['score'])
         logger.info('\n'.join(parsed_results_list))
         query_number += 1
         

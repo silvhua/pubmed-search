@@ -5,7 +5,7 @@ from retrieval_pipeline import *
 from django.http import HttpResponse
 
 # Create your views here.
-def retrieve(request, query, collection_name='test_set'):
+def retrieve(request, query, collection_name='test_set_5'):
     logger = create_function_logger(__name__, parent_logger=None, level=logging.INFO)
     retriever = Retrieve_Docs(collection_name, top_k=10, logger=logger)
     
@@ -17,7 +17,7 @@ def retrieve(request, query, collection_name='test_set'):
         parsed_result.pop('source_id')
         parsed_result['score'] = result.score
         parsed_results_list.append(parsed_result)
-    parsed_results_list = get_unique_dicts(parsed_results_list)
+    parsed_results_list = get_unique_dicts(parsed_results_list, keys_to_ignore=['score'])
     
     # logger.info('\n'.join(parsed_results_list))
     return HttpResponse(parsed_results_list)
