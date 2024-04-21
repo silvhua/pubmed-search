@@ -10,7 +10,8 @@ from Custom_Logger import *
 class Retrieve_Docs:
 
     def __init__(
-            self, collection_name, document_store=None, logger=None, logging_level=logging.INFO
+            self, collection_name, document_store=None, top_k=1,
+            logger=None, logging_level=logging.INFO
         ):
         self.logger = create_function_logger(__name__, parent_logger=logger, level=logging_level)
 
@@ -21,7 +22,7 @@ class Retrieve_Docs:
                 persist_path='../data/processed/'
                 )
         # https://docs.haystack.deepset.ai/docs/chromaembeddingretriever
-        retriever = ChromaEmbeddingRetriever(document_store=document_store, top_k=3)
+        retriever = ChromaEmbeddingRetriever(document_store=document_store, top_k=top_k)
         self.retrieval_pipeline = Pipeline()
         self.retrieval_pipeline.add_component("text_embedder", SentenceTransformersTextEmbedder(
             # model="thenlper/gte-large"
