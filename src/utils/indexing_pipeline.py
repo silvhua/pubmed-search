@@ -11,7 +11,10 @@ sys.path.append(r"/home/silvhua/custom_python")
 from silvhua import *
 from Custom_Logger import *
 
-def create_indexing_pipeline(document_store, metadata_fields=None):
+def replace_none_with_empty(input_list):
+    return [{key: '' if value is None else value for key, value in dictionary.items()} for dictionary in input_list]
+
+def create_indexing_pipeline(document_store, metadata_fields_to_embed=None):
     """
     Sample notebook: https://colab.research.google.com/github/deepset-ai/haystack-tutorials/blob/main/tutorials/39_Embedding_Metadata_for_Improved_Retrieval.ipynb#scrollTo=nAE4fVvsALXm
     """
@@ -19,7 +22,7 @@ def create_indexing_pipeline(document_store, metadata_fields=None):
     document_splitter = DocumentSplitter(split_by="sentence", split_length=2)
     document_embedder = SentenceTransformersDocumentEmbedder(
         # model="thenlper/gte-large", 
-        meta_fields_to_embed=metadata_fields
+        meta_fields_to_embed=metadata_fields_to_embed
     )
     document_writer = DocumentWriter(document_store=document_store, policy=DuplicatePolicy.OVERWRITE)
 
@@ -45,6 +48,7 @@ class Index_Docs():
             ):
         self.logger = create_function_logger(__name__, parent_logger=logger, level=logging_level)
         dictionary_list = load_json(json_filename, json_filepath)
+        dictionary_list = replace_none_with_empty(dictionary_list)
         raw_docs = []
         self.logger.info(f'***Instantiating `Index_Docs`***')
         for dictionary in dictionary_list:
@@ -68,13 +72,19 @@ if __name__ == "__main__":
         persist_path='../data/processed/'
         )
     
-    metadata_fields = ['article_title', 'journal']
-    
+    metadata_fields_to_embed = ['article_title', 'journal']
+    other_metadata_fields = [
+        'abstract', 'mesh_headings', 'keywords', 'major_topics', 'pmid', 'doi', 
+        'volume', 'issue', 'year', 'month', 'start_page', 'end_page', 
+        'authors', 'publication_type'
+    ]
+    metadata_fields = metadata_fields_to_embed + other_metadata_fields
+
     indexer = Index_Docs(
         filename, filepath, meta_keys=metadata_fields
         )
     indexing_pipeline = create_indexing_pipeline(
-        document_store, metadata_fields=metadata_fields
+        document_store, metadata_fields_to_embed=metadata_fields_to_embed
         )
     indexer.run_pipeline(indexing_pipeline, first_component_name='cleaner')
     logger.info(f'Finished indexing pipeline')
