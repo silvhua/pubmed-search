@@ -29,9 +29,10 @@ def index(request):
     return HttpResponse("Hello, world. You're at the semantic search index.")
 
 def my_custom_page_not_found_view(request, exception): 
-    question = 'what is wrong?'
-    return render(request, "404.html", {'question': question}, status=404)
+    message = 'Page not found, mothafucka!'
+    return render(request, "404.html", {"message": message})
     # return HttpResponse('Page not found, mothafucka!') # this works
 
 def test(request): # this works
-    return render(request, 'semantic_search/test.html')
+    text = 'what is wrong, dawg?'
+    return render(request, 'semantic_search/test.html', {'question': text})
