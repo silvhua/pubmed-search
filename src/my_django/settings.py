@@ -24,13 +24,15 @@ SECRET_KEY = 'django-insecure-zr8512*ta#a710u19jv-oju8k!=2)ff1^87by947-zj_5=phj6
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', 'localhost']
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    'semantic_search.apps.SemanticSearchConfig', ### Necessary to render templates
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
