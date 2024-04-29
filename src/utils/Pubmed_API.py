@@ -70,7 +70,10 @@ class Pubmed_API:
         Returns:
 
         API documentation: https://www.ncbi.nlm.nih.gov/books/NBK25499/#chapter4.ESearch
+        Comprehensive API documentation, including for Entrez Direct: https://www.ncbi.nlm.nih.gov/books/NBK25501/
         Pubmed User Guide including tags for filtering results: https://pubmed.ncbi.nlm.nih.gov/help/
+
+        Pubmed dataset on hugging face: https://huggingface.co/datasets/pubmed
         """
         base_url = f'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi'
         if self.api_key:
