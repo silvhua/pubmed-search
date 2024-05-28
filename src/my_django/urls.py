@@ -21,4 +21,4 @@ urlpatterns = [
     path("", include("semantic_search.urls")),
     path("admin/", admin.site.urls),
 ]
-handler404 = "semantic_search.views.my_custom_page_not_found_view"
+# handler404 = "semantic_search.views.my_custom_page_not_found_view" # optional because the Django already will use the 404.html template by default
