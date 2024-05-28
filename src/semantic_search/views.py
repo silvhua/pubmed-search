@@ -9,7 +9,10 @@ from retrieval_pipeline import *
 # Create your views here.
 def retrieve(request, query, collection_name='test_set_5'):
     logger = create_function_logger(__name__, parent_logger=None, level=logging.INFO)
-    retriever = Retrieve_Docs(collection_name, top_k=3, logger=logger)
+    retriever = Retrieve_Docs(collection_name, top_k=1, logger=logger)
+    results_dict = {
+        'query': query
+    }
     try:
         results_list = retriever.run(query)
         logger.info(f'Results list: {results_list}')
@@ -20,7 +23,7 @@ def retrieve(request, query, collection_name='test_set_5'):
             parsed_result['score'] = result.score
             parsed_results_list.append(parsed_result)
         parsed_results_list = get_unique_dicts(parsed_results_list, keys_to_ignore=['score'])
-        
+        results_dict['results'] = parsed_results_list
         logger.info(parsed_results_list)
     except Exception as error:
         exc_type, exc_obj, tb = sys.exc_info()
@@ -29,9 +32,9 @@ def retrieve(request, query, collection_name='test_set_5'):
         filename = f.f_code.co_filename
         message = f'An error occurred on line {lineno} in {filename}: {error}.'
         logger.error(message)
+    return render(request, 'semantic_search/retrieve.html', results_dict)
     # return HttpResponse(parsed_results_list)
-
-    return HttpResponse(f'Hello from `retrieve` function')
+    # return HttpResponse(f'Hello from `retrieve` function')
 
 def index(request):
     return HttpResponse("Hello, world. You're at the semantic search index.")
