@@ -1,2 +1,2 @@
-# pubmed-search
-Semantic search engine for PubMed database
+# Pubmed Search and Recommender System
+Semantic search engine & article recommender system for PubMed database
